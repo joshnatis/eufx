@@ -25,6 +25,7 @@ _eufx: put me in your PATH! let's be friends :D_
 * noise
 * posterize
 * nothing
+* invert
 
 The filters are coming, I assure you.
 
