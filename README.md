@@ -15,6 +15,8 @@ _/yo͞o,yə fəks/_
   * Most of them compress the images to shit, so they won't work.
   * Use ImageMagick's `convert` utility: `convert -compress none input.pgm output.pgm`
   
+_eufx: put me in your PATH! let's be friends :D_
+  
 ## Available Filters
 * reflect
 * rotate
