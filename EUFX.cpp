@@ -26,9 +26,10 @@ void scale_down(int img[MAX_HEIGHT][MAX_WIDTH], int height, int width, int scale
 void asciify(int img[MAX_HEIGHT][MAX_WIDTH], int height, int width, const std::string &fn);
 
 //image algorithm helpers (per pixel)
-int noise(int pixel);
-int posterize(int pixel);
+int noise(int pixel) { return (1 + rand() % MAX_GRAY); }
+int invert(int pixel) { return MAX_GRAY - pixel; }
 int nothing(int pixel) { return pixel; }
+int posterize(int pixel);
 char asciify(int pixel);
 
 //housekeeping helpers
@@ -49,7 +50,7 @@ void handle_errors(int argc, char **argv, const std::vector<std::string> &FILTER
 int main(int argc, char **argv)
 {
 	const std::vector<std::string> FILTERS = 
-	{"reflect", "rotate", "asciify", "scale_down", "noise", "posterize", "nothing"};
+	{"reflect", "rotate", "asciify", "scale_down", "noise", "posterize", "nothing", "invert"};
 
 	handle_errors(argc, argv, FILTERS);
 
@@ -77,6 +78,7 @@ int main(int argc, char **argv)
 	else if(filter == "noise") apply_filter(img, height, width, fout, noise);
 	else if(filter == "posterize") apply_filter(img, height, width, fout, posterize);
 	else if(filter == "nothing") apply_filter(img, height, width, fout, nothing);
+	else if(filter == "invert") apply_filter(img, height, width, fout, invert);
 
 	else if(filter == "asciify")
 	{
@@ -244,10 +246,6 @@ void scale_down(int img[MAX_HEIGHT][MAX_WIDTH], int height, int width, int scale
 =====================================
 */
 
-int noise(int pixel)
-{
-	return (1 + rand() % MAX_GRAY);
-}
 
 int posterize(int pixel)
 {
