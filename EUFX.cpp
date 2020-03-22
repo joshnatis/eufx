@@ -20,10 +20,11 @@ void read_image(int img[MAX_HEIGHT][MAX_WIDTH], int &height, int &width, std::if
 void apply_filter(int img[MAX_HEIGHT][MAX_WIDTH], int height, int width, std::ofstream &fout, int(*func)(int));
 
 //nonstandard algorithms (don't simply apply filter to each pixel)
-void rotate(int img[MAX_HEIGHT][MAX_WIDTH], int height, int width, std::ofstream &foutn);
+void rotate(int img[MAX_HEIGHT][MAX_WIDTH], int height, int width, std::ofstream &fout);
 void reflect(int img[MAX_HEIGHT][MAX_WIDTH], int height, int width, std::ofstream &fout);
 void scale_down(int img[MAX_HEIGHT][MAX_WIDTH], int height, int width, int scale, std::ofstream &fout);
 void asciify(int img[MAX_HEIGHT][MAX_WIDTH], int height, int width, const std::string &fn);
+void frame(int img[MAX_HEIGHT][MAX_WIDTH], int height, int width, std::ofstream &fout);
 
 //image algorithm helpers (per pixel)
 int noise(int pixel) { return (1 + rand() % MAX_GRAY); }
@@ -50,7 +51,7 @@ void handle_errors(int argc, char **argv, const std::vector<std::string> &FILTER
 int main(int argc, char **argv)
 {
 	const std::vector<std::string> FILTERS = 
-	{"reflect", "rotate", "asciify", "scale_down", "noise", "posterize", "nothing", "invert"};
+	{"reflect", "rotate", "asciify", "scale_down", "noise", "posterize", "nothing", "invert", "frame"};
 
 	handle_errors(argc, argv, FILTERS);
 
@@ -75,6 +76,7 @@ int main(int argc, char **argv)
 
 	if(filter == "reflect") reflect(img, height, width, fout);
 	else if(filter == "rotate") rotate(img, height, width, fout);
+	else if(filter == "frame") frame(img, height, width, fout);
 	else if(filter == "noise") apply_filter(img, height, width, fout, noise);
 	else if(filter == "posterize") apply_filter(img, height, width, fout, posterize);
 	else if(filter == "nothing") apply_filter(img, height, width, fout, nothing);
@@ -173,7 +175,7 @@ void reflect(int img[MAX_HEIGHT][MAX_WIDTH], int height, int width, std::ofstrea
 	for(int i = height - 1; i >= 0; --i)
 	{
 		for(int j = 0; j < width; j++)
-			fout << img[i][j] << " " << std::endl;
+			fout << img[i][j] << " ";
 		
 		fout << std::endl;
 	}
@@ -230,8 +232,33 @@ void scale_down(int img[MAX_HEIGHT][MAX_WIDTH], int height, int width, int scale
 	{
 		for(int j = 0; j < width; j+=scale)
 		{
-			fout << img[i][j] << " " << std::endl;
+			fout << img[i][j] << " ";
 		}
+		fout << std::endl;
+	}
+}
+
+void frame(int img[MAX_HEIGHT][MAX_WIDTH], int height, int width, std::ofstream &fout)
+{
+	fout << "P2\n";
+	fout << width << " " << height << std::endl;
+	fout << MAX_GRAY << std::endl;
+
+	const int BORDER_WIDTH = 5;
+
+	for(int i = 0; i < height; ++i)
+	{
+		for(int j = 0; j < width; ++j)
+		{
+			if(i < BORDER_WIDTH || j < BORDER_WIDTH
+				|| i > (height - BORDER_WIDTH) || j > (width - BORDER_WIDTH))
+			{
+				fout << 0 << " ";
+			}
+			else
+				fout << img[i][j] << " ";
+		}
+		fout << std::endl;
 	}
 }
 
