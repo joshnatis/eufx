@@ -1,9 +1,9 @@
 # eufx
-_/yo͞o,yə fəks/_
+_/yo͞o fəks/_
 
 ## Install and build
-1. git clone https://github.com/joshnatis/eufx.git
-2. make
+1. `git clone https://github.com/joshnatis/eufx.git`
+2. `make`
 
 ## Usage
 `./eufx --filter <filter_type> input.pgm output.pgm`
