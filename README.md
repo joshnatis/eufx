@@ -32,4 +32,4 @@ The filters are coming, I assure you.
 ## Background Information
 The PGM (Portable Graymap) format is an image format (like JPG or PNG). PGM formatted images only support black-and-white (there's no way to encode color), and they're not compressed at all, which makes them very easy to parse and work with (not to mention _thicc_). A PGM image is essentially a matrix of pixels, each of which being a value representing how light/dark it is. The images begin with some header information, noteably the specifications of the height and width, as well as the maximum gray value (i.e. what value constitutes as white). This last point means you can have an arbitrary number of shades of gray in your image, which is pretty cool (_well, actually the largest allowed maximum gray value is 65536_).
 
-A nice, succint specification of PGM images live [here](http://netpbm.sourceforge.net/doc/pgm.html).
+A nice, succint specification of PGM images lives [here](http://netpbm.sourceforge.net/doc/pgm.html).
