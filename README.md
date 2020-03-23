@@ -22,6 +22,7 @@ _eufx: put me in your PATH! let's be friends :D_
 * rotate
 * asciify
 * scale_down
+* scale_up
 * noise
 * posterize
 * nothing
