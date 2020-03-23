@@ -1,7 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
-#include <time.h> //noise filter
+#include <time.h> //noise filter, for random numbers
 
 
 //check if element is contained in an iterable container (used to check validity of filters)
@@ -15,6 +15,8 @@ int MAX_GRAY;
 
 //fills image matrix with values, sets height and width in callee to height/width values
 void read_image(int img[MAX_HEIGHT][MAX_WIDTH], int &height, int &width, std::ifstream &fin);
+//pass in a heap allocated matrix with pixel values, it'll be written to a pgm image file
+void write_image(int **out, int height, int width , std::ofstream &fout);
 
 //standard image algorithm, applies func to each pixel and writes
 void apply_filter(int img[MAX_HEIGHT][MAX_WIDTH], int height, int width, std::ofstream &fout, int(*func)(int));
@@ -23,6 +25,7 @@ void apply_filter(int img[MAX_HEIGHT][MAX_WIDTH], int height, int width, std::of
 void rotate(int img[MAX_HEIGHT][MAX_WIDTH], int height, int width, std::ofstream &fout);
 void reflect(int img[MAX_HEIGHT][MAX_WIDTH], int height, int width, std::ofstream &fout);
 void scale_down(int img[MAX_HEIGHT][MAX_WIDTH], int height, int width, int scale, std::ofstream &fout);
+void scale_up(int img[MAX_HEIGHT][MAX_WIDTH], int height, int width, int scale, std::ofstream &fout);
 void asciify(int img[MAX_HEIGHT][MAX_WIDTH], int height, int width, const std::string &fn);
 void frame(int img[MAX_HEIGHT][MAX_WIDTH], int height, int width, std::ofstream &fout);
 
@@ -51,7 +54,8 @@ void handle_errors(int argc, char **argv, const std::vector<std::string> &FILTER
 int main(int argc, char **argv)
 {
 	const std::vector<std::string> FILTERS = 
-	{"reflect", "rotate", "asciify", "scale_down", "noise", "posterize", "nothing", "invert", "frame"};
+	{"reflect", "rotate", "asciify", "scale_down", "scale_up", "noise",
+	"posterize", "nothing", "invert", "frame"};
 
 	handle_errors(argc, argv, FILTERS);
 
@@ -95,11 +99,43 @@ int main(int argc, char **argv)
 		int factor;
 		std::cout << "Scale down by what factor? (e.g. 2 to half): ";
 		std::cin >> factor;
+
+		if (std::cin.fail() || factor <= 0)
+		{
+			std::cout << "Invalid input, factor should be an integer greater than 0.\n";
+			remove(argv[4]); //delete now-empty file
+			exit(1);
+		}
+
 		scale_down(img, height, width, factor, fout);
+	}
+
+	else if(filter == "scale_up")
+	{
+		int factor;
+		std::cout << "Scale up by what factor? (e.g. 2 to double): ";
+		std::cin >> factor;
+
+		if (std::cin.fail() || factor <= 0)
+		{
+			std::cout << "Invalid input, factor should be an integer greater than 0.\n";
+			remove(argv[4]); //delete file
+			exit(1);
+		}
+
+		if(factor > 10)
+		{
+			std::cout << "Maybe that's a bit too large, chump. Try a smaller number.\n";
+			remove(argv[4]); //delete file
+			exit(1);
+		}
+
+		scale_up(img, height, width, factor, fout);
 	}
 
 	else std::cout << "Invalid filter! Use the --help flag for a list of available filters.\n";
 
+	fout.close();
 	return 0;
 }
 
@@ -238,6 +274,50 @@ void scale_down(int img[MAX_HEIGHT][MAX_WIDTH], int height, int width, int scale
 	}
 }
 
+void scale_up(int img[MAX_HEIGHT][MAX_WIDTH], int height, int width, int scale, std::ofstream &fout)
+{
+	//allocate enough heap space
+	int **out = new int*[height * scale];
+	for(int i = 0; i < height * scale; ++i)
+		out[i] = new int[width * scale];
+
+	//copy pixel value to a scale x scale rectangle
+	int val;
+	for(int i = 0; i < height; ++i)
+	{
+		for(int j = 0; j < width; ++j)
+		{
+			val = img[i][j];
+
+			out[i * scale][j * scale] = val;
+			out[i * scale + 1][j * scale] = val;
+			out[i * scale][j * scale + 1] = val;
+			out[i * scale + 1][j * scale + 1] = val;
+		}
+	}
+
+	write_image(out, height * scale, width * scale, fout);
+}
+
+void write_image(int **out, int height, int width , std::ofstream &fout)
+{
+	fout << "P2\n";
+	fout << width << " " << height << std::endl;
+	fout << MAX_GRAY << std::endl;
+
+	for(int i = 0; i < height; ++i)
+	{
+		for(int j = 0; j < width; ++j)
+		{
+			fout << out[i][j] << " ";
+		}
+		fout << std::endl;
+	}
+
+	for(int i = 0; i < height; ++i) //deallocate
+		delete[] out[i];
+}
+
 void frame(int img[MAX_HEIGHT][MAX_WIDTH], int height, int width, std::ofstream &fout)
 {
 	fout << "P2\n";
@@ -267,7 +347,7 @@ void frame(int img[MAX_HEIGHT][MAX_WIDTH], int height, int width, std::ofstream 
 ======================================
 ======================================
 
-		IMAGE ALGORITHM HELPERS
+	IMAGE ALGORITHM HELPERS
 
 =====================================
 =====================================
