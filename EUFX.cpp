@@ -1,44 +1,28 @@
+//todo --
+//(1) make filters compositable. 
+// 	this probably means heap allocating an out** and returning it from each function
+//	this way i dont have to write and read a file to apply multiple filters, i can just
+//	pass in the out array to multiple places
+//  drawbacks -- no more stack allocation (? maybe figure out how to deal with out[MAX_WIDTH][MAX_HEIGHT])
+//
+// (2) remove cin, only use command line args (scale_up, scale_down)
+// (3) fix scale_down where too many scales breaks the image
+// (4) properly credit https://lodev.org/cgtutor/filtering.html
+
 #include <iostream>
-#include <fstream>
 #include <vector>
-#include <time.h> //noise filter, for random numbers
+#include <fstream>
+
+#include "FILTERS.hpp"
 
 
 //check if element is contained in an iterable container (used to check validity of filters)
 #define contains(v, x) std::find(v.begin(), v.end(), x) != v.end()
 
 
-const int MAX_WIDTH = 1024;
-const int MAX_HEIGHT = 1024;
-int MAX_GRAY;
-
-
-//fills image matrix with values, sets height and width in callee to height/width values
-void read_image(int img[MAX_HEIGHT][MAX_WIDTH], int &height, int &width, std::ifstream &fin);
-//pass in a heap allocated matrix with pixel values, it'll be written to a pgm image file
-void write_image(int **out, int height, int width , std::ofstream &fout);
-
-//standard image algorithm, applies func to each pixel and writes
-void apply_filter(int img[MAX_HEIGHT][MAX_WIDTH], int height, int width, std::ofstream &fout, int(*func)(int));
-
-//nonstandard algorithms (don't simply apply filter to each pixel)
-void rotate(int img[MAX_HEIGHT][MAX_WIDTH], int height, int width, std::ofstream &fout);
-void reflect(int img[MAX_HEIGHT][MAX_WIDTH], int height, int width, std::ofstream &fout);
-void scale_down(int img[MAX_HEIGHT][MAX_WIDTH], int height, int width, int scale, std::ofstream &fout);
-void scale_up(int img[MAX_HEIGHT][MAX_WIDTH], int height, int width, int scale, std::ofstream &fout);
-void asciify(int img[MAX_HEIGHT][MAX_WIDTH], int height, int width, const std::string &fn);
-void frame(int img[MAX_HEIGHT][MAX_WIDTH], int height, int width, std::ofstream &fout);
-
-//image algorithm helpers (per pixel)
-int noise(int pixel) { return (1 + rand() % MAX_GRAY); }
-int invert(int pixel) { return MAX_GRAY - pixel; }
-int nothing(int pixel) { return pixel; }
-int posterize(int pixel);
-char asciify(int pixel);
-
 //housekeeping helpers
 void list_filters(const std::vector<std::string> &filters);
-void handle_errors(int argc, char **argv, const std::vector<std::string> &FILTERS);
+bool handle_errors(int argc, char **argv, const std::vector<std::string> &FILTERS);
 
 
 /*
@@ -55,20 +39,48 @@ int main(int argc, char **argv)
 {
 	const std::vector<std::string> FILTERS = 
 	{"reflect", "rotate", "asciify", "scale_down", "scale_up", "noise",
-	"posterize", "nothing", "invert", "frame"};
+	"posterize", "nothing", "invert", "frame", "box_blur", 
+	"gaussian_blur", "motion_blur", "sobol_edge_detection", 
+	"horizontal_edge_detection", "vertical_edge_detection",
+	"45_edge_detection", "all_edge_detection", "edge_detection_2",
+	"sharpen1", "sharpen2", "deepfry", "gridlines", "emboss", "acid",
+	"soundscape"};
 
-	handle_errors(argc, argv, FILTERS);
+	bool no_specified_output_file = handle_errors(argc, argv, FILTERS);
 
 	std::string input_img = argv[3];
 	std::ifstream fin;
 	fin.open(input_img);
 	if (fin.fail()) 
 	{
-		std::cout << "Unable to read file\n";
+		std::cout << "Unable to read input file.\n";
 		exit(1);
 	}
 
-	std::string output_img = argv[4];
+	std::string filter = argv[2];
+	std::string output_img;
+
+	if(no_specified_output_file)
+	{
+		//remove any path from the input file name
+		for(int i = 0; i < input_img.size(); ++i)
+		{
+			if(input_img[i] == '/')
+			{
+				input_img = input_img.substr(i+1);
+				i = 0;
+			}
+		}
+
+		//write to a default output file (input_<filter>.pgm/txt)
+		output_img = input_img.substr(0, input_img.length() - 4) + "_" + filter;
+
+		if(filter == "asciify") output_img += ".txt";
+		else output_img += ".pgm";
+
+	}
+	else output_img = argv[4];
+	
 	std::ofstream fout;
 	fout.open(output_img);
 
@@ -76,15 +88,254 @@ int main(int argc, char **argv)
 	int height, width; //set by read_image
 	read_image(img, height, width, fin);
 
-	std::string filter = argv[2];
-
 	if(filter == "reflect") reflect(img, height, width, fout);
 	else if(filter == "rotate") rotate(img, height, width, fout);
 	else if(filter == "frame") frame(img, height, width, fout);
+	else if(filter == "sobol_edge_detection") sobel(img, height, width, fout);
+	else if(filter == "gridlines") gridlines(img, height, width, fout);
+	else if(filter == "acid") acid(img, height, width, fout);
+
 	else if(filter == "noise") apply_filter(img, height, width, fout, noise);
 	else if(filter == "posterize") apply_filter(img, height, width, fout, posterize);
 	else if(filter == "nothing") apply_filter(img, height, width, fout, nothing);
 	else if(filter == "invert") apply_filter(img, height, width, fout, invert);
+
+	else if(filter == "box_blur")
+	{
+		double filter[5][5] =
+		{
+			0, 0, 1, 0, 0,
+			0, 1, 1, 1, 0,
+			1, 1, 1, 1, 1,
+			0, 1, 1, 1, 0,
+			0, 0, 1, 0, 0,
+		};
+
+		//to maintain brightness of image, filter must sum to 1
+		//but we'll just divide factor by total to avoid filling filter with 1/13
+		double factor = 1.0 / 13.0;
+		double bias = 0.0;
+
+		apply_filter(img, height, width, fout, filter, factor, bias);
+	}
+
+	else if(filter == "gaussian_blur")
+	{
+		double filter[5][5] =
+		{
+		  1,  4,  6,  4,  1,
+		  4, 16, 24, 16,  4,
+		  6, 24, 36, 24,  6,
+		  4, 16, 24, 16,  4,
+		  1,  4,  6,  4,  1,
+		};
+
+		double factor = 1.0 / 256.0;
+		double bias = 0.0;
+
+		apply_filter(img, height, width, fout, filter, factor, bias);
+	}
+
+	else if(filter == "motion_blur")
+	{
+		double filter[5][5] =
+		{
+			1, 0, 0, 0, 0,
+			0, 1, 0, 0, 0,
+			0, 0, 1, 0, 0,
+			0, 0, 0, 1, 0,
+			0, 0, 0, 0, 1,
+		};
+
+		double factor = 1.0 / 5.0;
+		double bias = 0.0;
+
+		apply_filter(img, height, width, fout, filter, factor, bias);
+	}
+
+	else if(filter == "horizontal_edge_detection")
+	{
+		double filter[5][5] =
+		{
+			0,  0, -1,  0,  0,
+			0,  0, -1,  0,  0,
+			0,  0,  2,  0,  0,
+			0,  0,  0,  0,  0,
+			0,  0,  0,  0,  0,
+		};
+
+		double factor = 1.0;
+		double bias = 0.0;
+
+		apply_filter(img, height, width, fout, filter, factor, bias);
+	}
+
+	else if(filter == "vertical_edge_detection")
+	{
+		double filter[5][5] =
+		{
+			0,  0, -1,  0,  0,
+			0,  0, -1,  0,  0,
+			0,  0,  4,  0,  0,
+			0,  0, -1,  0,  0,
+			0,  0, -1,  0,  0,
+		};
+
+		double factor = 1.0;
+		double bias = 0.0;
+
+		apply_filter(img, height, width, fout, filter, factor, bias);
+	}
+
+	else if(filter == "45_edge_detection")
+	{
+		double filter[5][5] =
+		{
+			-1,  0,  0,  0,  0,
+			0, -2,  0,  0,  0,
+			0,  0,  6,  0,  0,
+			0,  0,  0, -2,  0,
+			0,  0,  0,  0, -1,
+		};
+
+		double factor = 1.0;
+		double bias = 0.0;
+
+		apply_filter(img, height, width, fout, filter, factor, bias);
+	}
+
+	else if(filter == "all_edge_detection")
+	{
+		double filter[3][3] =
+		{
+			-1, -1, -1,
+			-1,  8, -1,
+			-1, -1, -1
+		};
+
+		double factor = 1.0;
+		double bias = 0.0;
+
+		apply_filter(img, height, width, fout, filter, factor, bias);
+	}
+
+	else if(filter == "sharpen1")
+	{
+		double filter[3][3] =
+		{
+			-1, -1, -1,
+			-1,  9, -1,
+			-1, -1, -1
+		};
+
+		double factor = 1.0;
+		double bias = 0.0;
+
+		apply_filter(img, height, width, fout, filter, factor, bias);
+	}
+
+	else if(filter == "sharpen2")
+	{
+		double filter[5][5] =
+		{
+		  -1, -1, -1, -1, -1,
+		  -1,  2,  2,  2, -1,
+		  -1,  2,  8,  2, -1,
+		  -1,  2,  2,  2, -1,
+		  -1, -1, -1, -1, -1,
+		};
+
+		double factor = 1.0 / 8.0;
+		double bias = 0.0;
+
+		apply_filter(img, height, width, fout, filter, factor, bias);
+	}
+
+	else if(filter == "deepfry")
+	{
+		double filter[5][5] =
+		{
+		  -1, -1, -1, -1, -1,
+		  -1,  2,  2,  2, -1,
+		  -1,  2,  8,  2, -1,
+		  -1,  2,  2,  2, -1,
+		  -1, -1, -1, -1, -1,
+		};
+
+		double factor = 1.0 / 8.0;
+		double bias = 0.0;
+
+		apply_filter(img, height, width, fout, filter, factor, bias);
+		int degrees_fried = 4; //larger == more fried
+
+		for(int i = 0; i < degrees_fried; ++i)
+		{
+			fin.clear();
+			fin.seekg(0);
+			fin.open(output_img);
+			read_image(img, height, width, fin);
+			fout.open(output_img);
+			apply_filter(img, height, width, fout, filter, factor, bias);
+		}
+	}
+
+	else if(filter == "edge_detection_2")
+	{
+		double filter[3][3] =
+		{
+			1,  1,  1,
+			1, -7,  1,
+			1,  1,  1
+		};
+
+		double factor = 1.0;
+		double bias = 0.0;
+
+		apply_filter(img, height, width, fout, filter, factor, bias);
+	}
+
+	else if(filter == "emboss")
+	{
+		double filter[5][5] =
+		{
+			-1, -1, -1, -1,  0,
+			-1, -1, -1,  0,  1,
+			-1, -1,  0,  1,  1,
+			-1,  0,  1,  1,  1,
+			0,  1,  1,  1,  1
+		};
+
+		double factor = 1.0;
+		double bias = 128.0;
+
+		apply_filter(img, height, width, fout, filter, factor, bias);
+	}
+
+	else if(filter == "soundscape")
+	{
+		//filter is pretty intensive, scale the image down first
+		int width_threshold = 128;
+		int projected_width = width;
+		int resizes = 0;
+		while(projected_width > width_threshold)
+		{
+			projected_width /= 2;
+			resizes++;
+		}
+
+		std::string temp_fn = ".soundscape_small.pgm";
+		std::ofstream temp(temp_fn);
+		scale_down(img, height, width, resizes, temp);
+		temp.close();
+
+		//read in scaled-down image
+		std::ifstream temp2(temp_fn);
+		read_image(img, height, width, temp2);
+		temp2.close();
+
+		remove(temp_fn); //delete temporary scaled_down image file
+		soundscape(img, height, width, fout);
+	}
 
 	else if(filter == "asciify")
 	{
@@ -104,6 +355,13 @@ int main(int argc, char **argv)
 		{
 			std::cout << "Invalid input, factor should be an integer greater than 0.\n";
 			remove(argv[4]); //delete now-empty file
+			exit(1);
+		}
+
+		if(width / factor < 1 || height / factor < 1)
+		{
+			std::cout << "Maybe that's a bit too small, chump. Try a smaller number.\n";
+			remove(argv[4]); //delete file
 			exit(1);
 		}
 
@@ -144,234 +402,6 @@ int main(int argc, char **argv)
 ======================================
 ======================================
 
-		IMAGE ALGORITHMS
-
-=====================================
-=====================================
-*/
-
-//fills image matrix with values, sets h and w in callee to height/width values
-void read_image(int img[MAX_HEIGHT][MAX_WIDTH], int &height, int &width, std::ifstream &fin)
-{
-	std::string header;
-	getline(fin, header); //should be p5 or p2
-
-	// skip the comments (if any)
-	while ((fin >> std::ws).peek() == '#')
-		fin.ignore(4096, '\n');
-
-	fin >> width >> height >> MAX_GRAY;
-	for(int i = 0; i < height; ++i)
-	{
-		for(int j = 0; j < width; ++j)
-			fin >> img[i][j];
-	}
- 
-	if(width > 1024 || height > 1024)
-	{
-		std::cout << "Your image is too large, the maximum width/height is 1024px\n";
-		exit(1);
-	}
-
-	fin.close();
-}
-
-//standard image algorithm, applies func to each pixel and writes
-void apply_filter(int img[MAX_HEIGHT][MAX_WIDTH], int height, int width, std::ofstream &fout, int(*func)(int))
-{
-	fout << "P2\n";
-	fout << width << " " << height << std::endl;
-	fout << MAX_GRAY << std::endl;
-
-	for(int i = 0; i < height; ++i)
-	{
-		for(int j = 0; j < width; ++j)
-		{
-			fout << func(img[i][j]) << " ";
-		}
-		fout << std::endl;
-	}
-}
-
-//outputs an image of dimensions (height * 2) x width (reflection on lower half)
-void reflect(int img[MAX_HEIGHT][MAX_WIDTH], int height, int width, std::ofstream &fout)
-{	
-	fout << "P2\n";
-	fout << width << " " << height * 2 << std::endl;
-	fout << MAX_GRAY << std::endl;
-
-	for(int i = 0; i < height; ++i)
-	{
-		for(int j = 0; j < width; ++j)
-			fout << img[i][j] << " " << std::endl;
-
-		fout << std::endl;
-	}
-
-	for(int i = height - 1; i >= 0; --i)
-	{
-		for(int j = 0; j < width; j++)
-			fout << img[i][j] << " ";
-		
-		fout << std::endl;
-	}
-}
-
-//rotate 90 degrees counter clockwise
-void rotate(int img[MAX_HEIGHT][MAX_WIDTH], int height, int width, std::ofstream &fout)
-{	
-	fout << "P2\n";
-	fout << height << " " << width << std::endl; //flipped
-	fout << MAX_GRAY << std::endl;
-
-	for(int i = 0; i < width; ++i)
-	{
-		for(int j = 0; j < height; ++j)
-		{
-			fout << img[j][i] << " ";
-		}
-		fout << std::endl;
-	}
-}
-
-//outputs a txt file with ascii characters resembling the original image
-void asciify(int img[MAX_HEIGHT][MAX_WIDTH], int height, int width, const std::string &fn)
-{
-	std::ofstream fout;
-
-	if(fn.substr(fn.size() - 3) != "txt")
-	{
-		std::cout << "The asciify filter requires your output file to be a txt file!\n";
-		exit(1);
-	}
-	else
-		fout.open(fn);
-
-	for(int i = 0; i < height; ++i)
-	{
-		for(int j = 0; j < width; ++j)
-		{
-			fout << asciify(img[i][j]);
-		}
-		fout << std::endl;
-	}
-}
-
-//shrinks the image by a user-specified factor
-void scale_down(int img[MAX_HEIGHT][MAX_WIDTH], int height, int width, int scale, std::ofstream &fout)
-{
-	fout << "P2\n";
-	fout << width/scale << " " << height/scale << std::endl;
-	fout << MAX_GRAY << std::endl;
-
-	for(int i = 0; i < height; i+=scale)
-	{
-		for(int j = 0; j < width; j+=scale)
-		{
-			fout << img[i][j] << " ";
-		}
-		fout << std::endl;
-	}
-}
-
-void scale_up(int img[MAX_HEIGHT][MAX_WIDTH], int height, int width, int scale, std::ofstream &fout)
-{
-	//allocate enough heap space
-	int **out = new int*[height * scale];
-	for(int i = 0; i < height * scale; ++i)
-		out[i] = new int[width * scale];
-
-	//copy pixel value to a scale x scale rectangle
-	int val;
-	for(int i = 0; i < height; ++i)
-	{
-		for(int j = 0; j < width; ++j)
-		{
-			val = img[i][j];
-
-			out[i * scale][j * scale] = val;
-			out[i * scale + 1][j * scale] = val;
-			out[i * scale][j * scale + 1] = val;
-			out[i * scale + 1][j * scale + 1] = val;
-		}
-	}
-
-	write_image(out, height * scale, width * scale, fout);
-}
-
-void write_image(int **out, int height, int width , std::ofstream &fout)
-{
-	fout << "P2\n";
-	fout << width << " " << height << std::endl;
-	fout << MAX_GRAY << std::endl;
-
-	for(int i = 0; i < height; ++i)
-	{
-		for(int j = 0; j < width; ++j)
-		{
-			fout << out[i][j] << " ";
-		}
-		fout << std::endl;
-	}
-
-	for(int i = 0; i < height; ++i) //deallocate
-		delete[] out[i];
-}
-
-void frame(int img[MAX_HEIGHT][MAX_WIDTH], int height, int width, std::ofstream &fout)
-{
-	fout << "P2\n";
-	fout << width << " " << height << std::endl;
-	fout << MAX_GRAY << std::endl;
-
-	const int BORDER_WIDTH = 5;
-
-	for(int i = 0; i < height; ++i)
-	{
-		for(int j = 0; j < width; ++j)
-		{
-			if(i < BORDER_WIDTH || j < BORDER_WIDTH
-				|| i > (height - BORDER_WIDTH) || j > (width - BORDER_WIDTH))
-			{
-				fout << 0 << " ";
-			}
-			else
-				fout << img[i][j] << " ";
-		}
-		fout << std::endl;
-	}
-}
-
-
-/*
-======================================
-======================================
-
-	IMAGE ALGORITHM HELPERS
-
-=====================================
-=====================================
-*/
-
-
-int posterize(int pixel)
-{
-	if(pixel > MAX_GRAY/2) return MAX_GRAY;
-	else return 0;
-}
-
-char asciify(int pixel)
-{
-	if(pixel > 200) return '.';
-	else if(pixel > 100) return '*';
-	else return '#';
-}
-
-
-/*
-======================================
-======================================
-
 	PROGRAM HOUSEKEEPING HELPERS
 
 =====================================
@@ -385,11 +415,13 @@ void list_filters(const std::vector<std::string> &filters)
 		std::cout << "-" << filters[i] << "\n";
 }
 
-void handle_errors(int argc, char **argv, const std::vector<std::string> &FILTERS)
+bool handle_errors(int argc, char **argv, const std::vector<std::string> &FILTERS)
 {
+	std::string usage = "--filter <filter_type> input.pgm [output.pgm]";
+
 	if(argc == 1)
 	{
-		std::cout << "Usage: " << argv[0] << " --filter <filter_type> input.pgm output.pgm\n";
+		std::cout << "Usage: " << argv[0] << usage << "\n";
 		std::cout << "Try the --help flag\n";
 		exit(1);
 	}
@@ -398,20 +430,42 @@ void handle_errors(int argc, char **argv, const std::vector<std::string> &FILTER
 
 	if(flag == "-h" || flag == "--help" || flag == "help")
 	{
-		std::cout << "Usage: " << argv[0] << " --filter <filter_type> input.pgm output.pgm\n";
+		std::cout << "Usage: " << argv[0] << usage << "\n";
 		std::cout << "\nAvailable filters:\n";
 		list_filters(FILTERS);
 		std::cout << "\n";
 		exit(1);
 	}
 
-	if(argc != 5 || flag != "--filter")
+	if(argc < 4 || flag != "--filter")
 	{
-		std::cout << "Usage: " << argv[0] << " --filter <filter_type> input.pgm output.pgm\n";
+		std::cout << "Usage: " << argv[0] << usage << "\n";
+		exit(1);
+	}
+
+	std::string input_img = argv[3];
+
+	if(input_img.length() < 4 || input_img.substr(input_img.size() - 4) != ".pgm")
+	{
+		std::cout << "Input file must be of type pgm for this filter!\n";
 		exit(1);
 	}
 
 	std::string filter = argv[2];
+	bool no_specified_output_file; //user did not enter an output file name
+	std::string output_img;
+
+	if(argc == 4) no_specified_output_file = true; //missing 5th argument
+	else if(argc == 5)
+	{
+		no_specified_output_file = false; //5th argument is output file
+		output_img = argv[4];
+	}
+	else
+	{
+		std::cout << "Usage: " << argv[0] << usage << "\n";
+		exit(1);
+	}
 
 	if(!(contains(FILTERS, filter)))
 	{
@@ -419,25 +473,20 @@ void handle_errors(int argc, char **argv, const std::vector<std::string> &FILTER
 		exit(1);
 	}
 
-	std::string input_img = argv[3];
-	std::string output_img = argv[4];
-
 	if(input_img == output_img)
 	{
 		std::cout << "Input and output images cannot be the same file!\n";
 		exit(1);
 	}
 
-	if(input_img.substr(input_img.size() - 3) != "pgm")
-	{
-		std::cout << "Input file must be of type pgm for this filter!\n";
-		exit(1);
-	}
-
-	if(filter != "asciify" 
-		&& output_img.substr(output_img.size() - 3) != "pgm")
+	//check if output file is the proper type of file
+	if(!no_specified_output_file && 
+		(output_img.length() < 4 || 
+		(filter != "asciify" && output_img.substr(output_img.size() - 4) != ".pgm")))
 	{
 		std::cout << "Output file must be of type pgm for this filter!\n";
 		exit(1);
 	}
+
+	return no_specified_output_file;
 }
