@@ -28,6 +28,22 @@ _eufx: put me in your PATH! let's be friends :D_
 * nothing
 * invert
 * frame
+* box_blur
+* gaussian_blur
+* motion_blur
+* sobol_edge_detection
+* horizontal_edge_detection
+* vertical_edge_detection
+* 45_edge_detection
+* all_edge_detection
+* edge_detection_2
+* sharpen1
+* sharpen2
+* deepfry
+* gridlines
+* emboss
+* acid
+* soundscape
 
 The filters are coming, I assure you.
 
