@@ -1,14 +1,11 @@
 CXX=g++
 CXXFLAGS=-std=c++11
 
-eufx: EUFX.cpp
+eufx: EUFX.cpp FILTERS.hpp
 	$(CXX) $(CXXFLAGS) EUFX.cpp -o eufx
 
-careful: EUFX.cpp
-	$(CXX) $(CXXFLAGS) -Wall -g EUFX.cpp -o eufx
-
 clean:
-	rm eufx
+	rm eufx FILTERS.hpp.gch
 
 organize:
 	mv *pgm images/results
