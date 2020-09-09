@@ -45,7 +45,30 @@ _eufx: put me in your PATH! let's be friends :D_
 * acid
 * soundscape
 
-The filters are coming, I assure you.
+## Pictures!
+
+Originals:
+
+![cat](outputs/cat.jpg)
+![cat2](outputs/cat2.jpg)
+![dog](outputs/dog.jpg)
+
+Filtered:
+
+![cat median](outputs/cat_median.jpg)
+![cat2_median](outputs/cat2_median.jpg)
+![edge](outputs/edge.jpg)
+![invertedv](outputs/invertedv.jpg)
+![motion](outputs/motion.jpg)
+![noise](outputs/noise.jpg)
+![pix](outputs/pix.jpg)
+![postercat](outputs/postercat.jpg)
+![randomcade](outputs/randomcade.jpg)
+![sharp2](outputs/sharp2.jpg)
+![sharp4](outputs/sharp4.jpg)
+![soundscape2](outputs/soundscape2.jpg)
+
+
 
 ## Background Information
 The PGM (Portable Graymap) format is an image format (like JPG or PNG). PGM formatted images only support black-and-white (there's no way to encode color), and they're not compressed at all, which makes them very easy to parse and work with (not to mention _thicc_). A PGM image is essentially a matrix of pixels, each of which being a value representing how light/dark it is. The images begin with some header information, noteably the specifications of the height and width, as well as the maximum gray value (i.e. what value constitutes as white). This last point means you can have an arbitrary number of shades of gray in your image, which is pretty cool (_well, actually the largest allowed maximum gray value is 65536_).
