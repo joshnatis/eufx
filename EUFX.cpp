@@ -333,7 +333,7 @@ int main(int argc, char **argv)
 		read_image(img, height, width, temp2);
 		temp2.close();
 
-		remove(temp_fn); //delete temporary scaled_down image file
+		remove(temp_fn.c_str()); //delete temporary scaled_down image file
 		soundscape(img, height, width, fout);
 	}
 
