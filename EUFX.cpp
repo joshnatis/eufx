@@ -417,7 +417,7 @@ void list_filters(const std::vector<std::string> &filters)
 
 bool handle_errors(int argc, char **argv, const std::vector<std::string> &FILTERS)
 {
-	std::string usage = "--filter <filter_type> input.pgm [output.pgm]";
+	std::string usage = " --filter <filter_type> input.pgm [output.pgm]";
 
 	if(argc == 1)
 	{
